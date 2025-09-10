@@ -7,24 +7,55 @@
     <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
+<div class="app" id="app">
+    <!-- LEFT PANEL (desktop only) -->
+    <div class="panel" id="leftPanel">
+      <div class="brand">
+        <div class="logo">TR</div>
+        <div>
+          <h1>Tracking</h1>
+          <div class="sub">Dashboard monitoring</div>
+        </div>
+      </div>
 
-    <div class="container">
-        <h1>Dashboard Tracking Anti Fake Aplikasi/Manipulasi</h1>
-        <div id="fake-alerts">
-            <p><strong> LOKASI PALSU TERDETEKSI:</strong></p>
-            <ul id="alert-list"></ul>
-        </div>
-        <div id="employee-list">
-            <p><strong>Status Lokasi Live:</strong></p>
-            <p>By : Achmad Firdaus</p>
-            <p id="list-status">Menunggu data...</p>
-        </div>
-        <div id="map-container"></div>
+      <div class="search">
+        <input id="searchInput" placeholder="Cari" />
+        <button id="btnShowAll" title="Tampilkan Semua">👥</button>
+      </div>
+
+      <div class="section-title">Daftar</div>
+      <div id="listWrap"></div>
+
+      <div class="section-title">Peringatan</div>
+      <div id="alertsBox" class="alerts"></div>
+
+      <div class="help">Klik nama untuk fokus. Di mobile tekan tanda di pojok bawah untuk buka panel.</div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- MAP -->
+    <div id="map"></div>
+  </div>
+
+  <!-- Bottom sheet (mobile) -->
+  <div id="bottomSheet" class="bottom-sheet" aria-hidden="true">
+    <div class="sheet-handle" id="sheetHandle"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <input id="sheetSearch" placeholder="Cari" style="flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#e6eef8;" />
+      <button id="sheetShowAll" style="padding:10px;border-radius:10px;border:none;background:var(--accent);color:white;">👥</button>
+    </div>
+    <div class="sheet-content">
+      <div class="section-title">Daftar</div>
+      <div id="sheetList"></div>
+      <div class="section-title" style="margin-top:12px">Peringatan</div>
+      <div id="sheetAlerts" class="alerts" style="display:none;margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- libs -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
     
     <script src="main.js">
         // GANTI DENGAN KONFIGURASI FIREBASE-MU
