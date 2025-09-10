@@ -1,119 +1,308 @@
 const firebaseConfig = {
-            apiKey: "AIzaSyATp2TW5seBULA5-vAfBV8tfnS9jYEhRDo",
-            authDomain: "absensi-48cef.firebaseapp.com",
-            databaseURL: "https://absensi-48cef-default-rtdb.asia-southeast1.firebasedatabase.app/",
-            projectId: "absensi-48cef",
-            storageBucket: "absensi-48cef.firebasestorage.app",
-            messagingSenderId: "652126290992",
-            appId: "1:652126290992:web:ede30d62f3141b690799f5"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+    apiKey: "AIzaSyATp2TW5seBULA5-vAfBV8tfnS9jYEhRDo",
+    authDomain: "absensi-48cef.firebaseapp.com",
+    databaseURL: "https://absensi-48cef-default-rtdb.asia-southeast1.firebasedatabase.app/",
+    projectId: "absensi-48cef",
+    storageBucket: "absensi-48cef.firebasestorage.app",
+    messagingSenderId: "652126290992",
+    appId: "1:652126290992:web:ede30d62f3141b690799f5"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-        const mapContainer = document.getElementById('map-container');
-        const employeeList = document.getElementById('employee-list');
-        const listStatus = document.getElementById('list-status');
-        const fakeAlertsDiv = document.getElementById('fake-alerts');
-        const alertListUl = document.getElementById('alert-list');
-        
-        const map = L.map('map-container').setView([0, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+  /***** MAP INIT *****/
+  const map = L.map('map').setView([-6.200, 106.816], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-        let markers = {};
+  /***** ICONS *****/
+  const blueIcon = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
+  const redIcon  = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
+  const orangeIcon = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
+  const grayIcon = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
 
-        const customBlueIcon = new L.Icon({
-            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
+  /***** STATE *****/
+  const MAX_HISTORY = 150;
+  let markers = {};
+  let polylines = {};
+  let history = {};     // history[userId] = [{lat,lon,time,_isFakeDevice,_suspicious}, ...]
+  let lastPos = {};     // lastPos[userId] = {lat,lon,time}
 
-        const customRedIcon = new L.Icon({
-            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
+  const listWrap = document.getElementById('listWrap');
+  const alertsBox = document.getElementById('alertsBox');
+  const searchInput = document.getElementById('searchInput');
+  const btnShowAll = document.getElementById('btnShowAll');
 
-        const customGrayIcon = new L.Icon({ // Ikon baru untuk status berhenti
-            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
+  const bottomSheet = document.getElementById('bottomSheet');
+  const sheetHandle = document.getElementById('sheetHandle');
+  const sheetList = document.getElementById('sheetList');
+  const sheetAlerts = document.getElementById('sheetAlerts');
+  const sheetSearch = document.getElementById('sheetSearch');
+  const sheetShowAll = document.getElementById('sheetShowAll');
 
-        db.ref('locations').on('value', (snapshot) => {
-            const data = snapshot.val();
-            let hasData = false;
-            let listHtml = '';
-            let fakeUsers = [];
-            
-            for (let id in markers) {
-                if (!data || !data[id]) {
-                    map.removeLayer(markers[id]);
-                    delete markers[id];
-                }
-            }
+  // Utility: haversine -> meters
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+    const a = Math.sin(Δφ/2)*Math.sin(Δφ/2)+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)*Math.sin(Δλ/2);
+    const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R*c;
+  }
 
-            if (data) {
-                hasData = true;
-                for (const userId in data) {
-                    const employee = data[userId];
-                    const lat = employee.lat;
-                    const long = employee.long;
-                    const isFake = employee.isFake;
-                    const status = employee.status; // Ambil status baru
-                    const address = employee.address || "Alamat tidak ditemukan";
-                    const timestamp = employee.timestamp || "Waktu tidak diketahui";
+  // Hybrid detection: device flag + speed anomaly
+  function detectSuspicious(userId, lat, lon, timestamp) {
+    const last = lastPos[userId];
+    let suspicious = false;
+    let reason = '';
 
-                    if (markers[userId]) {
-                        markers[userId].setLatLng([lat, long]);
-                    } else {
-                        markers[userId] = L.marker([lat, long]).addTo(map);
-                    }
-                    
-                    if (status === 'stopped') {
-                        markers[userId].setIcon(customGrayIcon);
-                        markers[userId].bindPopup(`<b>${userId}</b><br>Tracking Dihentikan<br>Waktu: ${timestamp}`).openPopup();
-                        listHtml += `<div class="employee-status"><span class="stopped">●</span> <b>${userId}</b>: Tracking Dihentikan<br><small>Waktu: ${timestamp}</small></div>`;
-                    } else if (isFake) {
-                         markers[userId].setIcon(customRedIcon);
-                        markers[userId].bindPopup(`<b>${userId}</b><br>LOKASI PALSU<br>Alamat: ${address}<br>Waktu: ${timestamp}`).openPopup();
-                        fakeUsers.push(userId);
-                        const statusText = 'LOKASI PALSU';
-                        listHtml += `<div class="employee-status"><span class="fake">●</span> <b>${userId}</b>: ${statusText}<br><small>Waktu: ${timestamp}</small></div>`;
-                    } else {
-                        markers[userId].setIcon(customBlueIcon);
-                        markers[userId].bindPopup(`<b>${userId}</b><br>Lokasi Asli<br>Alamat: ${address}<br>Waktu: ${timestamp}`).openPopup();
-                        const statusText = 'Lokasi Asli';
-                        listHtml += `<div class="employee-status"><span class="normal">●</span> <b>${userId}</b>: ${statusText}<br><small>Waktu: ${timestamp}</small></div>`;
-                    }
-                }
-                
-                const lastUser = Object.keys(data).pop();
-                if (data[lastUser]) {
-                    map.setView([data[lastUser].lat, data[lastUser].long], 16);
-                }
-            }
-            
-            listStatus.innerHTML = hasData ? listHtml : 'Menunggu data...';
+    if (last) {
+      const dist = haversine(last.lat, last.lon, lat, lon); // meters
+      const dt = Math.max(1, (timestamp - last.time) / 1000); // seconds
+      const speedKmh = (dist / dt) * 3.6; // km/h
+      // threshold: >300 km/h suspicious
+      if (speedKmh > 300) { suspicious = true; reason = `speed:${Math.round(speedKmh)}km/h`; }
+    }
+    return { suspicious, reason };
+  }
 
-            if (fakeUsers.length > 0) {
-                fakeAlertsDiv.style.display = 'block';
-                let alertHtml = '';
-                fakeUsers.forEach(user => {
-                    alertHtml += `<li><b>${user}</b> memakai fake GPS.</li>`;
-                });
-                alertListUl.innerHTML = alertHtml;
-            } else {
-                fakeAlertsDiv.style.display = 'none';
-            }
-        });
+  // Render list & alerts (both desktop and sheet)
+  function renderListAndAlerts(latestData) {
+    const fragment = document.createDocumentFragment();
+    const sheetFragment = document.createDocumentFragment();
+    let alerts = [];
+
+    const keys = Object.keys(latestData || {});
+    keys.sort((a,b) => {
+      const ta = latestData[a]?.timestamp ? new Date(latestData[a].timestamp).getTime() : 0;
+      const tb = latestData[b]?.timestamp ? new Date(latestData[b].timestamp).getTime() : 0;
+      return tb - ta;
+    });
+
+    keys.forEach(userId => {
+      const emp = latestData[userId];
+      if (!emp || typeof emp.lat === 'undefined' || typeof emp.long === 'undefined') return;
+
+      // computed suspicious (last history entry)
+      const lastHist = history[userId] && history[userId].slice(-1)[0];
+      const computedSusp = !!(lastHist && lastHist._suspicious);
+
+      // desktop card
+      const card = document.createElement('div'); card.className = 'user-card';
+      card.onclick = () => focusEmployee(userId);
+      const left = document.createElement('div'); left.className = 'user-left';
+      const avatar = document.createElement('div'); avatar.className='avatar'; avatar.textContent = userId.slice(0,2).toUpperCase();
+      const nameWrap = document.createElement('div');
+      const name = document.createElement('div'); name.className='u-name'; name.textContent = userId;
+      const meta = document.createElement('div'); meta.className='u-meta'; meta.textContent = emp.timestamp || '';
+      nameWrap.appendChild(name); nameWrap.appendChild(meta);
+      left.appendChild(avatar); left.appendChild(nameWrap);
+
+      const right = document.createElement('div');
+      const dot = document.createElement('div'); dot.className = 'status-dot ' + (emp.isFake ? 'status-fake' : (computedSusp ? 'status-susp' : (emp.status === 'stopped' ? 'status-stopped' : 'status-normal')));
+      right.appendChild(dot);
+      card.appendChild(left); card.appendChild(right);
+      fragment.appendChild(card);
+
+      // sheet card (clone)
+      const sCard = card.cloneNode(true);
+      sCard.onclick = () => { focusEmployee(userId); toggleSheet(false); };
+      sheetFragment.appendChild(sCard);
+
+      // alerts
+      if (emp.isFake) alerts.push(`🚨 ${userId} terdeteksi Fake GPS (device).`);
+      if (computedSusp) alerts.push(`⚠️ ${userId} pergerakan mencurigakan.`);
+    });
+
+    // Insert into DOM
+    listWrap.innerHTML = '';
+    listWrap.appendChild(fragment);
+    sheetList.innerHTML = '';
+    sheetList.appendChild(sheetFragment);
+
+    // alerts
+    if (alerts.length) {
+      alertsBox.style.display = 'block';
+      alertsBox.innerHTML = alerts.map(a => `<div>${a}</div>`).join('');
+      sheetAlerts.style.display = 'block';
+      sheetAlerts.innerHTML = alerts.map(a => `<div>${a}</div>`).join('');
+    } else {
+      alertsBox.style.display = 'none';
+      sheetAlerts.style.display = 'none';
+      alertsBox.innerHTML = '';
+      sheetAlerts.innerHTML = '';
+    }
+  }
+
+  // Focus helpers
+  function focusEmployee(userId) {
+    // hide all
+    for (const id in markers) {
+      try { map.removeLayer(markers[id]); } catch(e){}
+    }
+    for (const id in polylines) {
+      try { map.removeLayer(polylines[id]); } catch(e){}
+    }
+    // show only chosen
+    if (polylines[userId]) map.addLayer(polylines[userId]);
+    if (markers[userId]) { map.addLayer(markers[userId]); markers[userId].openPopup(); map.setView(markers[userId].getLatLng(), 15); }
+  }
+  function showAll() {
+    for (const id in markers) { try { map.addLayer(markers[id]); } catch(e){} }
+    for (const id in polylines) { try { map.addLayer(polylines[id]); } catch(e){} }
+  }
+
+  // Toggle bottom sheet
+  function toggleSheet(open=true) {
+    if (open) { bottomSheet.classList.add('open'); bottomSheet.setAttribute('aria-hidden','false'); }
+    else { bottomSheet.classList.remove('open'); bottomSheet.setAttribute('aria-hidden','true'); }
+  }
+
+  // Make sheet draggable by handle (basic)
+  (function attachSheetDrag(){
+    let startY = 0, currentY = 0, dragging = false;
+    sheetHandle.addEventListener('touchstart', e => { dragging=true; startY = e.touches[0].clientY; });
+    sheetHandle.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      currentY = e.touches[0].clientY;
+      const delta = currentY - startY;
+      if (delta > 40) { toggleSheet(false); dragging=false; }
+    });
+    sheetHandle.addEventListener('touchend', () => { dragging=false; });
+    // click handle toggles
+    sheetHandle.addEventListener('click', () => {
+      const isOpen = bottomSheet.classList.contains('open');
+      toggleSheet(!isOpen);
+    });
+  })();
+
+  // Connect UI search inputs
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    const cards = Array.from(document.querySelectorAll('.user-card'));
+    if (!q) { cards.forEach(c => c.style.display='flex'); return; }
+    cards.forEach(c => {
+      const name = c.querySelector('.u-name')?.textContent?.toLowerCase() || '';
+      c.style.display = name.includes(q) ? 'flex' : 'none';
+    });
+    // also mirror to sheet
+    sheetSearch.value = searchInput.value;
+    sheetSearch.dispatchEvent(new Event('input'));
+  });
+  sheetSearch.addEventListener('input', () => {
+    const q = sheetSearch.value.trim().toLowerCase();
+    const cards = Array.from(document.querySelectorAll('#sheetList .user-card'));
+    if (!q) { cards.forEach(c => c.style.display='flex'); return; }
+    cards.forEach(c => {
+      const name = c.querySelector('.u-name')?.textContent?.toLowerCase() || '';
+      c.style.display = name.includes(q) ? 'flex' : 'none';
+    });
+    // sync desktop search
+    searchInput.value = sheetSearch.value;
+  });
+
+  btnShowAll.addEventListener('click', () => { showAll(); searchInput.value=''; searchInput.dispatchEvent(new Event('input')); });
+  sheetShowAll.addEventListener('click', () => { showAll(); sheetSearch.value=''; sheetSearch.dispatchEvent(new Event('input')); toggleSheet(false); });
+
+  // MAIN: listen firebase data
+  db.ref('locations').on('value', snap => {
+    const data = snap.val() || {};
+
+    // update or create markers/polylines
+    for (const userId in data) {
+      const emp = data[userId];
+      if (!emp || typeof emp.lat === 'undefined' || typeof emp.long === 'undefined') continue;
+      const lat = Number(emp.lat);
+      const lon = Number(emp.long);
+      const now = Date.now();
+
+      // history push (with device flag)
+      if (!history[userId]) history[userId] = [];
+      const entry = { lat, lon, time: now, _isFakeDevice: !!emp.isFake, _suspicious: false };
+      history[userId].push(entry);
+      if (history[userId].length > MAX_HISTORY) history[userId].shift();
+
+      // detect suspicious
+      const det = detectSuspicious(userId, lat, lon, now);
+      if (det.suspicious) entry._suspicious = true;
+
+      // update lastPos
+      lastPos[userId] = { lat, lon, time: now };
+
+      // marker
+      if (!markers[userId]) {
+        markers[userId] = L.marker([lat, lon], { icon: blueIcon }).addTo(map);
+      } else {
+        markers[userId].setLatLng([lat, lon]);
+      }
+
+      // polyline
+      const coords = history[userId].map(h => [h.lat, h.lon]);
+      const color = emp.isFake ? '#ef4444' : (entry._suspicious ? '#f59e0b' : '#3b82f6');
+      if (!polylines[userId]) {
+        polylines[userId] = L.polyline(coords, { color: color, weight: 4 }).addTo(map);
+      } else {
+        polylines[userId].setLatLngs(coords);
+        polylines[userId].setStyle({ color: color });
+      }
+
+      // set icon priority: device fake > computed suspicious > stopped > normal
+      
+      
+      if (emp.isFake) markers[userId].setIcon(redIcon);
+      else if (entry._suspicious) markers[userId].setIcon(orangeIcon);
+      else if (emp.status === 'stopped') markers[userId].setIcon(grayIcon);
+      else markers[userId].setIcon(blueIcon);
+      
+
+      // popup text (generic)
+      const alertText = (emp.isFake || entry._suspicious) ? '🚨 Fake GPS Terdeteksi' : 'Lokasi Terverifikasi';
+      const popup = `<b>${userId}</b><br>${alertText}<br>Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}<br>${emp.timestamp || ''}`;
+      markers[userId].bindPopup(popup);
+    }
+              
+    // remove deleted users
+    for (const id in markers) {
+      if (!data[id]) {
+        try { map.removeLayer(markers[id]); } catch(e){}
+        try { map.removeLayer(polylines[id]); } catch(e){}
+        delete markers[id]; delete polylines[id]; delete history[id]; delete lastPos[id];
+      }
+    }
+
+    // render list & alerts
+    renderListAndAlerts(data);
+
+    // auto-fit to last user if any (desktop friendly)
+    const ids = Object.keys(data);
+    if (ids.length) {
+      const last = ids[ids.length-1];
+      if (data[last]) map.setView([data[last].lat, data[last].long], 12);
+    }
+  });
+
+  // On mobile, open bottom sheet when tap near bottom or press map control (we add small floating button)
+  (function addMobileToggle(){
+    const btn = document.createElement('button');
+    btn.textContent = '☰';
+    btn.title = 'Buka daftar';
+    btn.style.position = 'fixed';
+    btn.style.right = '12px';
+    btn.style.bottom = '12px';
+    btn.style.zIndex = 1200;
+    btn.style.padding = '12px';
+    btn.style.border = 'none';
+    btn.style.borderRadius = '12px';
+    btn.style.background = 'rgba(0,0,0,0.6)';
+    btn.style.color = 'white';
+    btn.style.boxShadow = '0 8px 20px rgba(0,0,0,0.4)';
+    btn.addEventListener('click', () => toggleSheet(true));
+    document.body.appendChild(btn);
+  })();
+
+  // Prevent map attribution overlapping bottom sheet: adjust on resize
+  window.addEventListener('resize', () => {
+    // small hack: force leaflet controls reposition
+    try { map.invalidateSize(); } catch(e){}
+  });
