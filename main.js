@@ -15,10 +15,10 @@ const map = L.map('map').setView([-6.200, 106.816], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
 /***** ICONS *****/
-const blueIcon = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
-const redIcon  = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
-const orangeIcon = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
-const grayIcon = new L.Icon({ iconUrl:'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
+const blueIcon = new L.Icon({ iconUrl:'Biru.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
+const redIcon  = new L.Icon({ iconUrl:'Merah.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
+const orangeIcon = new L.Icon({ iconUrl:'Orangee.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
+const grayIcon = new L.Icon({ iconUrl:'Abuuu.png', shadowUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png', iconSize:[25,41], iconAnchor:[12,41]});
 
 /***** STATE *****/
 const MAX_HISTORY = 150;
